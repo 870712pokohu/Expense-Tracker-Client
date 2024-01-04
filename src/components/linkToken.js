@@ -1,33 +1,64 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePlaidLink } from "react-plaid-link";
+import { useNavigate } from "react-router-dom";
 
 const Link = ({linkToken}) =>{
 
-  const config = {
-    token: linkToken, 
-    onSuccess: async (public_token, metadata) => {
-      console.log(public_token)
-      console.log(metadata)
-      const response = await fetch('/api/set_access_token', {
+  const [linkOpen, setLinkOpen] = useState(false);
+  const navigate = useNavigate();
+  const user = JSON.parse(localStorage.getItem('user'));
+  const email = user.email;
+
+  const onSuccess = useCallback( 
+    async (public_token, metadata)=>{
+      await fetch('/api/set_access_token', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`
         },
-        body: JSON.stringify({public_token}),
+        body: JSON.stringify({public_token, email}),
       });
-      console.log(response.body)
-    }
-  }
+  },[email, user]);
 
+  const onEvent = useCallback(
+    async(eventName, metadata)=>{
+      console.log(metadata);
+      console.log(eventName);
+      // redirect to other page when the link is hand off
+      if(eventName === 'HANDOFF'){
+        setLinkOpen(true);
+      }
+    },[])
 
+  const onExit = useCallback(
+    async(error, metadata)=>{
+      if(error != null){
+        console.log(error);
+      }
+  },[])
+
+  const config = {
+    token: linkToken, 
+    onSuccess: onSuccess,
+    onEvent: onEvent,
+    onExit: onExit
+  };
+  
   const {open, ready} = usePlaidLink(config);
   
-  return(
-    <button onClick={()=>open()} disabled={!ready}>
-      Link Account
-    </button>
-  )
+  if(ready){
+    open();
+  }
+  
 
+  // if(linkOpen === true){
+  //   navigate('/')
+  // }else{
+  //   return(
+  //     <div>loading...</div>
+  //   )
+  // }
 
 }
 
